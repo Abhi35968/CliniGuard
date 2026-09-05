@@ -4,7 +4,15 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-from langgraph.checkpoint.sqlite import SqliteSaver
+try:
+    from langgraph.checkpoint.sqlite import SqliteSaver
+except (ImportError, ModuleNotFoundError):
+    try:
+        from langgraph_checkpoint_sqlite import SqliteSaver
+    except (ImportError, ModuleNotFoundError):
+        SqliteSaver = None
+
+from langgraph.checkpoint.memory import MemorySaver
 
 try:
     from src.config import DATABASE_PATH
@@ -68,12 +76,18 @@ def init_db():
 init_db()
 
 
-def get_sqlite_checkpointer() -> SqliteSaver:
-    """Returns an initialized SqliteSaver checkpointer for LangGraph."""
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
-    saver = SqliteSaver(conn)
-    saver.setup()
-    return saver
+def get_sqlite_checkpointer():
+    """Returns an initialized SqliteSaver checkpointer for LangGraph with fallback to MemorySaver."""
+    if SqliteSaver is not None:
+        try:
+            conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+            saver = SqliteSaver(conn)
+            if hasattr(saver, "setup"):
+                saver.setup()
+            return saver
+        except Exception as e:
+            print(f"[get_sqlite_checkpointer] Warning: Could not initialize SqliteSaver ({e}). Using MemorySaver.")
+    return MemorySaver()
 
 
 def create_or_update_session(

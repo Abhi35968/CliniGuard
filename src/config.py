@@ -5,6 +5,16 @@ from dotenv import load_dotenv
 # Load .env file
 load_dotenv()
 
+# Also load from Streamlit secrets if running on Streamlit Cloud
+try:
+    import streamlit as st
+    if hasattr(st, "secrets"):
+        for k, v in st.secrets.items():
+            if isinstance(v, (str, int, float, bool)) and k not in os.environ:
+                os.environ[k] = str(v)
+except Exception:
+    pass
+
 # Root workspace directory
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
