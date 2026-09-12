@@ -1,4 +1,4 @@
-# 🌦️ MediBuddy: Clinical Weather-Advisory System
+# 🛡️ CliniGuard: Clinical Weather-Advisory System
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
@@ -6,7 +6,7 @@
 [![Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**MediBuddy** is an enterprise-grade, agentic clinical weather-advisory platform designed to generate medically grounded, context-aware health advisories based on real-time meteorological conditions, demographic vulnerabilities, and activities. Powered by **LangGraph**, it executes strict deterministic rule matching alongside multi-provider LLM reasoning, backed by automated grounding guardrails and multi-turn SQLite session persistence.
+**CliniGuard** is an enterprise-grade, agentic clinical weather-advisory platform designed to generate medically grounded, context-aware health advisories based on real-time meteorological conditions, demographic vulnerabilities, and activities. Powered by **LangGraph**, it executes strict deterministic rule matching alongside multi-provider LLM reasoning, backed by automated grounding guardrails and multi-turn SQLite session persistence.
 
 ---
 
@@ -54,7 +54,7 @@ flowchart TD
 ## 📁 Repository Structure
 
 ```
-MediBuddy/
+CliniGuard/
 ├── data/
 │   ├── medi_state.db          # SQLite database for persistent session storage
 │   └── sops.json              # Clinical Standard Operating Procedures library
@@ -93,8 +93,8 @@ MediBuddy/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/MediBuddy.git
-cd MediBuddy
+git clone https://github.com/your-username/CliniGuard.git
+cd CliniGuard
 ```
 
 ### 2. Set Up a Virtual Environment
@@ -190,4 +190,4 @@ Clinical guidelines are defined declaratively in `data/sops.json`. Each SOP spec
 ## 🔒 Safety & Disclaimer
 
 > [!CAUTION]
-> **MediBuddy is an informational decision-support demonstration tool.** It is **not** a certified medical diagnostic device and does not substitute for professional medical diagnosis, advice, or treatment. Always consult qualified healthcare professionals for medical emergencies and clinical conditions.
+> **CliniGuard is an informational decision-support demonstration tool.** It is **not** a certified medical diagnostic device and does not substitute for professional medical diagnosis, advice, or treatment. Always consult qualified healthcare professionals for medical emergencies and clinical conditions.

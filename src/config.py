@@ -24,7 +24,8 @@ if not os.path.isabs(SOPS_FILE_PATH):
     SOPS_FILE_PATH = str(ROOT_DIR / SOPS_FILE_PATH)
 
 # SQLite Database path for checkpoints and conversation persistence
-DATABASE_PATH = os.getenv("DATABASE_PATH", str(ROOT_DIR / "data" / "medi_state.db"))
+_default_db = str(ROOT_DIR / "data" / "medi_state.db") if (ROOT_DIR / "data" / "medi_state.db").exists() else str(ROOT_DIR / "data" / "cliniguard_state.db")
+DATABASE_PATH = os.getenv("DATABASE_PATH", _default_db)
 if not os.path.isabs(DATABASE_PATH):
     DATABASE_PATH = str(ROOT_DIR / DATABASE_PATH)
 
@@ -50,3 +51,4 @@ OPEN_METEO_FORECAST_URL = os.getenv(
 
 # Request timeout in seconds
 WEATHER_API_TIMEOUT = 10.0
+

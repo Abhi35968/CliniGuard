@@ -1,3 +1,3 @@
-"""MediBuddy Weather-Advisory Support Bot Package."""
+"""CliniGuard Weather-Advisory Support Bot Package."""
 
 __version__ = "1.0.0"

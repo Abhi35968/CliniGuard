@@ -24,7 +24,7 @@ from src.db import (
 
 # Page configuration
 st.set_page_config(
-    page_title="MediBuddy | Clinical Weather-Advisory System",
+    page_title="CliniGuard | Clinical Weather-Advisory System",
     page_icon="🌦️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -344,7 +344,7 @@ st.markdown(
     f"""
     <div class='clinical-header-container'>
         <div>
-            <div class='clinical-title'>MediBuddy | Clinical Weather-Advisory System</div>
+            <div class='clinical-title'>🛡️ CliniGuard | Clinical Weather-Advisory System</div>
             <div class='clinical-subtitle'>Safety-critical outdoor activity guidance strictly grounded in authorized SOPs & live Open-Meteo meteorological telemetry.</div>
         </div>
         <div style='text-align: right;'>

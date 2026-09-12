@@ -66,7 +66,7 @@ def parse_and_extract_node(state: AgentState) -> Dict[str, Any]:
             if content.startswith("```"):
                 content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
                 content = re.sub(r"```$", "", content).strip()
-            
+        
             parsed = json.loads(content)
             raw_act = parsed.get("activity") or existing_act
             canonical_act = raw_act
@@ -123,7 +123,7 @@ def ask_clarification_node(state: AgentState) -> Dict[str, Any]:
     act = state.get("activity") or "your outdoor activity"
     msg = (
         f"### 📍 Location Required for Weather Safety Advisory\n\n"
-        f"I am ready to evaluate authorized MediBuddy safety guidelines for **{act}**, but require your target location to retrieve verified live meteorological telemetry.\n\n"
+        f"I am ready to evaluate authorized CliniGuard safety guidelines for **{act}**, but require your target location to retrieve verified live meteorological telemetry.\n\n"
         f"- **Target Activity:** `{act}`\n"
         f"- **Required Information:** Please specify your **city or location** (*e.g., 'Mumbai', 'Delhi', 'Bengaluru', 'Kolkata'*).\n\n"
         f"---\n"
@@ -198,7 +198,7 @@ def weather_error_node(state: AgentState) -> Dict[str, Any]:
         f"- **Target Location:** `{loc}`\n"
         f"- **Diagnostic Reason:** {err}\n\n"
         f"#### 🛡️ Compliance & Safety Notice\n"
-        f"MediBuddy safety policies strictly prohibit generating speculative or estimated advisories "
+        f"CliniGuard safety policies strictly prohibit generating speculative or estimated advisories "
         f"without live meteorological data. Please verify the city spelling or try again in a few moments.\n\n"
         f"---\n"
         f"*Status: Telemetry Unavailable — Speculative generation prohibited.*"
@@ -286,13 +286,13 @@ def no_sop_fallback_node(state: AgentState) -> Dict[str, Any]:
         f"| **UV Index** | {uv} |\n\n"
         f"---\n\n"
         f"#### ℹ️ Clinical Policy Scope Notice\n"
-        f"MediBuddy does not currently have a formal standard operating procedure (SOP) safety policy covering **'{act}'** "
+        f"CliniGuard does not currently have a formal standard operating procedure (SOP) safety policy covering **'{act}'** "
         f"under these specific environmental parameters.\n\n"
         f"- **Safety Protocol:** Because all clinical advice must strictly adhere to verified organizational policies, "
         f"speculative recommendations without an authorized SOP are prohibited.\n"
         f"- **Recommendation:** Please exercise individual discretion and observe local civic and meteorological bulletins.\n\n"
         f"---\n"
-        f"*MediBuddy Clinical & Environmental Advisory System*"
+        f"*CliniGuard Clinical & Environmental Advisory System*"
     )
     return {
         "final_response": msg,
@@ -363,7 +363,7 @@ def _format_structured_advisory_template(
         f"{precautions_list}"
         f"{secondary_section}\n\n"
         f"---\n"
-        f"*MediBuddy Clinical & Environmental Advisory System — Grounded in live Open-Meteo telemetry & authorized clinical SOPs.*"
+        f"*CliniGuard Clinical & Environmental Advisory System — Grounded in live Open-Meteo telemetry & authorized clinical SOPs.*"
     )
 
 
