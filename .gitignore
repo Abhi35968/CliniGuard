@@ -1,38 +1,114 @@
-# Environment and Keys
-.env
-.env.local
-*.env
-
-# Python
+# Python & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+
+# Virtual Environments
 .venv/
+venv/
 ENV/
+env/
+myvenv/
+tf_env/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
 
 # Testing & Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# Streamlit
-.streamlit/
+# Jupyter Notebooks
+.ipynb_checkpoints/
 
-# SQLite Databases
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
-
-# IDE / OS
+# IDE & OS
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Logs & Temp
+*.log
+logs/
+tmp/
+temp/
+
+# Node.js Dependencies & Build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vite/
+.oxlint_cache/
+.eslintcache
+.cache/
+
+# Model Binaries & Weights
+*.h5
+*.keras
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.bin
+*.joblib
+*.pkl
+
+# Datasets & Vector Stores
+*.nc
+*.nc4
+*.hdf
+*.hdf5
+*.index
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Existing Project Specific Ignores
+.env.local
+*.env
+.streamlit/
