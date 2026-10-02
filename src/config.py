@@ -29,10 +29,17 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", _default_db)
 if not os.path.isabs(DATABASE_PATH):
     DATABASE_PATH = str(ROOT_DIR / DATABASE_PATH)
 
-# LLM Configuration
+# Global & Task-Specific LLM Configuration
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
 MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.0"))
+
+INTENT_MODEL = os.getenv("INTENT_MODEL", MODEL_NAME)
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", MODEL_NAME)
+GUARDRAIL_MODEL = os.getenv("GUARDRAIL_MODEL", MODEL_NAME)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
 # API Keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
@@ -50,5 +57,8 @@ OPEN_METEO_FORECAST_URL = os.getenv(
 )
 
 # Request timeout in seconds
-WEATHER_API_TIMEOUT = 10.0
+WEATHER_API_TIMEOUT = float(os.getenv("WEATHER_API_TIMEOUT", "10.0"))
 
+# Feature Flags
+ENABLE_SEMANTIC_RETRIEVAL = os.getenv("ENABLE_SEMANTIC_RETRIEVAL", "true").lower() == "true"
+ENABLE_INPUT_GUARDRAILS = os.getenv("ENABLE_INPUT_GUARDRAILS", "true").lower() == "true"

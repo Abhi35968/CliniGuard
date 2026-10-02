@@ -4,7 +4,9 @@ from langgraph.graph import StateGraph, START, END
 from src.state import AgentState
 from src.db import get_sqlite_checkpointer, save_turn
 from src.nodes import (
+    input_guardrail_node,
     parse_and_extract_node,
+    planner_agent_node,
     check_location_condition,
     ask_clarification_node,
     fetch_weather_node,
@@ -21,11 +23,13 @@ from src.nodes import (
 
 
 def build_weather_graph() -> StateGraph:
-    """Constructs the LangGraph state machine with branching, loops, and conditional routing."""
+    """Constructs the LangGraph state machine with input guardrail, planner agent, tools, and output validation."""
     workflow = StateGraph(AgentState)
 
     # 1. Register Nodes
+    workflow.add_node("input_guardrail", input_guardrail_node)
     workflow.add_node("parse_and_extract", parse_and_extract_node)
+    workflow.add_node("planner_agent", planner_agent_node)
     workflow.add_node("ask_clarification", ask_clarification_node)
     workflow.add_node("fetch_weather", fetch_weather_node)
     workflow.add_node("weather_error", weather_error_node)
@@ -36,15 +40,33 @@ def build_weather_graph() -> StateGraph:
     workflow.add_node("deterministic_fallback", deterministic_fallback_node)
 
     # 2. Add Edges & Conditional Branches
-    workflow.add_edge(START, "parse_and_extract")
+    workflow.add_edge(START, "input_guardrail")
 
-    # Branch 1: Location Check
+    # Branch 0: Input Guardrail Check
+    def check_input_guardrail_condition(state: AgentState) -> str:
+        if not state.get("input_guardrail_passed", True):
+            return "input_guardrail_failed"
+        return "parse_and_extract"
+
     workflow.add_conditional_edges(
-        "parse_and_extract",
+        "input_guardrail",
+        check_input_guardrail_condition,
+        {
+            "input_guardrail_failed": END,
+            "parse_and_extract": "parse_and_extract",
+        },
+    )
+
+    workflow.add_edge("parse_and_extract", "planner_agent")
+
+    # Branch 1: Location & Planning Check
+    workflow.add_conditional_edges(
+        "planner_agent",
         check_location_condition,
         {
             "ask_clarification": "ask_clarification",
             "fetch_weather": "fetch_weather",
+            "input_guardrail_failed": END,
         },
     )
 
@@ -115,19 +137,25 @@ def run_agent_turn(
         "session_id": session_id,
         "raw_query": user_query,
         "messages": [{"role": "user", "content": user_query}],
+        "user_context": prev_values.get("user_context"),
         "location": prev_values.get("location"),
         "activity": prev_values.get("activity"),
         "timeframe": prev_values.get("timeframe"),
         "demographics": prev_values.get("demographics", []),
+        "intent": prev_values.get("intent"),
         "pending_clarification": prev_values.get("pending_clarification", False),
         "clarification_target": prev_values.get("clarification_target"),
         "weather_data": prev_values.get("weather_data"),
         "weather_error": None,
+        "retrieved_sops": [],
         "matched_sops": [],
         "active_sop": None,
+        "risk_assessment": None,
         "sop_citation": None,
+        "input_guardrail_passed": None,
         "grounding_valid": None,
         "grounding_errors": [],
+        "guardrail_results": [],
         "retry_count": 0,
         "final_response": None,
         "route": None,

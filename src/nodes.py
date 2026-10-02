@@ -1,20 +1,67 @@
 import json
 import re
+import time
 from typing import Dict, Any, List, Optional
-from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.state import AgentState
-from src.weather import WeatherService
-from src.sop_engine import SOPEngine, ACTIVITY_SYNONYMS
-from src.llm import get_llm, extract_entities_fallback
+from src.schemas.context import UserContext
+from src.schemas.risk import RiskAssessment
+from src.tools.weather import WeatherTool, WeatherService
+from src.tools.sop_tool import SOPRetrieverTool
+from src.agents.context_agent import ContextExtractionAgent
+from src.agents.planner import PlannerAgent
+from src.policy.engine import DeterministicPolicyEngine
+from src.guardrails.input import InputGuardrail
+from src.guardrails.output import OutputGuardrailPipeline
+from src.llm.factory import get_llm_for_task
+from src.llm.prompts import ADVISORY_GENERATION_SYSTEM_PROMPT
+from src.observability.tracer import ExecutionTracer
 
-weather_service = WeatherService()
-sop_engine = SOPEngine()
+# Singleton component instances
+weather_tool = WeatherTool()
+weather_service = weather_tool.service
+context_agent = ContextExtractionAgent()
+planner_agent = PlannerAgent()
+sop_retriever_tool = SOPRetrieverTool()
+policy_engine = DeterministicPolicyEngine()
+input_guardrail = InputGuardrail()
+output_guardrail_pipeline = OutputGuardrailPipeline()
+
+
+def input_guardrail_node(state: AgentState) -> Dict[str, Any]:
+    """Validates user query against prompt injection and security policies."""
+    query = state.get("raw_query", "").strip()
+    result = input_guardrail.validate_input(query)
+
+    if not result.passed:
+        msg = (
+            f"### 🛡️ CliniGuard Security & Compliance Notice\n\n"
+            f"Your request could not be processed because it violates system security guidelines.\n\n"
+            f"- **Security Details:** {result.details}\n"
+            f"- **Notice:** System safety policies and clinical SOPs cannot be bypassed or overridden.\n\n"
+            f"---\n"
+            f"*Status: Refused by Input Security Guardrail.*"
+        )
+        return {
+            "input_guardrail_passed": False,
+            "final_response": msg,
+            "sop_citation": "INPUT_GUARDRAIL_BLOCKED",
+            "route": "input_guardrail_failed",
+            "guardrail_results": [result.model_dump()],
+            "execution_trace": [f"Input Guardrail: FAILED ({result.details})"],
+            "messages": [{"role": "assistant", "content": msg}],
+        }
+
+    return {
+        "input_guardrail_passed": True,
+        "guardrail_results": [result.model_dump()],
+        "execution_trace": ["Input Guardrail: PASSED."],
+    }
 
 
 def parse_and_extract_node(state: AgentState) -> Dict[str, Any]:
     """
-    Parses user query and merges extracted entities with session history.
+    Parses user query and merges extracted entities with session history using ContextExtractionAgent.
     Handles mid-clarification state if bot previously requested missing info.
     """
     query = state.get("raw_query", "").strip()
@@ -25,14 +72,19 @@ def parse_and_extract_node(state: AgentState) -> Dict[str, Any]:
     is_mid_clarification = state.get("pending_clarification", False)
     clarification_target = state.get("clarification_target")
 
-    # Case A: Handling pending clarification (e.g. user supplied city name directly after prompt)
+    # Case A: Handling pending clarification (e.g. user supplied city name directly)
     if is_mid_clarification and clarification_target == "location":
-        # Extract location candidate directly from short response
-        extracted_cand = extract_entities_fallback(query, {})
-        new_loc = extracted_cand.get("location") or query.replace("in ", "").replace("at ", "").strip().title()
+        extracted_cand = context_agent.extract_context(query, {})
+        new_loc = extracted_cand.location or query.replace("in ", "").replace("at ", "").strip().title()
         
         trace_entry = f"Mid-clarification resolved: Location='{new_loc}' (Preserved Activity='{existing_act}')"
         return {
+            "user_context": UserContext(
+                location=new_loc,
+                activity=existing_act,
+                timeframe=existing_tf or "today",
+                demographics=existing_demos,
+            ).model_dump(),
             "location": new_loc,
             "activity": existing_act,
             "timeframe": existing_tf or "today",
@@ -42,84 +94,64 @@ def parse_and_extract_node(state: AgentState) -> Dict[str, Any]:
             "execution_trace": [trace_entry],
         }
 
-    # Case B: Standard multi-turn entity extraction
-    llm = get_llm()
-    extracted = None
+    # Case B: Standard extraction via ContextExtractionAgent
+    session_ctx = {
+        "location": existing_loc,
+        "activity": existing_act,
+        "timeframe": existing_tf,
+        "demographics": existing_demos,
+    }
+    extracted_ctx = context_agent.extract_context(query, session_ctx)
 
-    if llm:
-        try:
-            sys_prompt = (
-                "You are an entity extraction engine for a weather advisory system. "
-                "Extract the following fields from the user's input, combining with existing session context if available:\n"
-                "- location: city name (string or null)\n"
-                "- activity: outdoor activity e.g., cycling, running, walking, picnic, driving, playground (string or null)\n"
-                "- timeframe: e.g., 'today', 'this evening', 'tomorrow morning', 'afternoon', 'now' (string or null)\n"
-                "- demographics: list of mentioned vulnerable groups e.g., ['children', 'elderly', 'pets'] (list)\n"
-                "Return ONLY a JSON object with these 4 keys. Do not include markdown fences or any other text."
-            )
-            context_summary = f"Existing Session Context -> Location: {existing_loc}, Activity: {existing_act}, Timeframe: {existing_tf}, Demographics: {existing_demos}"
-            user_msg = f"{context_summary}\nNew User Message: \"{query}\""
-            
-            response = llm.invoke([SystemMessage(content=sys_prompt), HumanMessage(content=user_msg)])
-            content = response.content.strip()
-            # Strip markdown json blocks if present
-            if content.startswith("```"):
-                content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
-                content = re.sub(r"```$", "", content).strip()
-        
-            parsed = json.loads(content)
-            raw_act = parsed.get("activity") or existing_act
-            canonical_act = raw_act
-            if raw_act:
-                raw_lower = raw_act.lower()
-                for can_name, syn_list in ACTIVITY_SYNONYMS.items():
-                    if raw_lower == can_name or raw_lower in syn_list:
-                        canonical_act = can_name
-                        break
+    trace_entry = (
+        f"Context Agent Extracted: Loc='{extracted_ctx.location}', Act='{extracted_ctx.activity}', "
+        f"TF='{extracted_ctx.timeframe}', Demo={extracted_ctx.demographics}"
+    )
 
-            extracted = {
-                "location": parsed.get("location") or existing_loc,
-                "activity": canonical_act,
-                "timeframe": parsed.get("timeframe") or existing_tf or "today",
-                "demographics": list(set(parsed.get("demographics", []) + existing_demos)),
-            }
-        except Exception as e:
-            print(f"[parse_and_extract_node] LLM extraction error: {e}. Falling back.")
-            extracted = None
-
-    if not extracted:
-        extracted = extract_entities_fallback(
-            query,
-            {
-                "location": existing_loc,
-                "activity": existing_act,
-                "timeframe": existing_tf,
-                "demographics": existing_demos,
-            },
-        )
-
-    trace_entry = f"Extracted: Loc='{extracted.get('location')}', Act='{extracted.get('activity')}', TF='{extracted.get('timeframe')}', Demo={extracted.get('demographics')}"
-    
     return {
-        "location": extracted.get("location"),
-        "activity": extracted.get("activity"),
-        "timeframe": extracted.get("timeframe"),
-        "demographics": extracted.get("demographics", []),
+        "user_context": extracted_ctx.model_dump(),
+        "location": extracted_ctx.location,
+        "activity": extracted_ctx.activity,
+        "timeframe": extracted_ctx.timeframe,
+        "demographics": extracted_ctx.demographics,
         "pending_clarification": False,
         "clarification_target": None,
         "execution_trace": [trace_entry],
     }
 
 
+def planner_agent_node(state: AgentState) -> Dict[str, Any]:
+    """Executes PlannerAgent to determine tool execution flow."""
+    ctx_dict = state.get("user_context") or {}
+    ctx = UserContext(**ctx_dict) if ctx_dict else UserContext(
+        location=state.get("location"),
+        activity=state.get("activity"),
+        timeframe=state.get("timeframe"),
+        demographics=state.get("demographics", []),
+    )
+    query = state.get("raw_query", "")
+
+    plan = planner_agent.plan(ctx, query)
+    trace_msg = f"Planner Agent Decision: needs_clarification={plan.needs_clarification}, tools={plan.tools_to_run}, reasoning='{plan.reasoning}'"
+
+    return {
+        "pending_clarification": plan.needs_clarification,
+        "clarification_target": plan.clarification_target,
+        "execution_trace": [trace_msg],
+    }
+
+
 def check_location_condition(state: AgentState) -> str:
     """Conditional routing based on location availability."""
-    if not state.get("location"):
+    if not state.get("input_guardrail_passed", True):
+        return "input_guardrail_failed"
+    if state.get("pending_clarification") or not state.get("location"):
         return "ask_clarification"
     return "fetch_weather"
 
 
 def ask_clarification_node(state: AgentState) -> Dict[str, Any]:
-    """Generates formal, structured clarification prompt when location is missing and flags pending state."""
+    """Generates formal clarification prompt when location is missing."""
     act = state.get("activity") or "your outdoor activity"
     msg = (
         f"### 📍 Location Required for Weather Safety Advisory\n\n"
@@ -141,34 +173,23 @@ def ask_clarification_node(state: AgentState) -> Dict[str, Any]:
 
 
 def fetch_weather_node(state: AgentState) -> Dict[str, Any]:
-    """Fetches live meteorological telemetry from Open-Meteo."""
+    """Fetches live meteorological telemetry using WeatherTool."""
     location = state.get("location", "")
     timeframe = state.get("timeframe")
 
-    loc_info, loc_err = weather_service.resolve_location(location)
-    if loc_err or not loc_info:
+    res = weather_tool.run(location=location, timeframe=timeframe)
+
+    if not res["success"] or not res["weather_data"]:
+        err_msg = res.get("error") or f"Could not find coordinates or weather for '{location}'"
         return {
             "weather_data": None,
-            "weather_error": loc_err or f"Could not find coordinates for '{location}'",
-            "execution_trace": [f"Geocoding failed: {loc_err}"],
+            "weather_error": err_msg,
+            "execution_trace": [f"Weather Tool error: {err_msg}"],
         }
 
-    weather, w_err = weather_service.fetch_live_weather(
-        latitude=loc_info["latitude"],
-        longitude=loc_info["longitude"],
-        location_name=f"{loc_info['name']}, {loc_info.get('admin1', '')} ({loc_info.get('country', '')})",
-        timeframe=timeframe,
-    )
-
-    if w_err or not weather:
-        return {
-            "weather_data": None,
-            "weather_error": w_err or "Weather forecast unavailable",
-            "execution_trace": [f"Weather API error: {w_err}"],
-        }
-
+    weather = res["weather_data"]
     trace_msg = (
-        f"Weather fetched for {weather['location_name']}: "
+        f"Weather Tool fetched for {weather['location_name']}: "
         f"Temp={weather['temperature_2m']}°C, RainProb={weather['precipitation_probability']}%, "
         f"Rain={weather['precipitation']}mm, Wind={weather['wind_speed_10m']}km/h, UV={weather['uv_index']}"
     )
@@ -213,38 +234,53 @@ def weather_error_node(state: AgentState) -> Dict[str, Any]:
 
 
 def evaluate_sops_node(state: AgentState) -> Dict[str, Any]:
-    """Evaluates decoupled SOPs and resolves multi-matches using deterministic priority hierarchy."""
+    """Retrieves SOPs via SOPRetrieverTool and evaluates RiskAssessment via DeterministicPolicyEngine."""
     weather = state.get("weather_data", {})
-    activity = state.get("activity")
-    demographics = state.get("demographics", [])
-    timeframe = state.get("timeframe")
-    raw_query = state.get("raw_query", "")
+    query = state.get("raw_query", "")
 
-    matched = sop_engine.evaluate(
+    ctx_dict = state.get("user_context") or {}
+    ctx = UserContext(**ctx_dict) if ctx_dict else UserContext(
+        location=state.get("location"),
+        activity=state.get("activity"),
+        timeframe=state.get("timeframe"),
+        demographics=state.get("demographics", []),
+    )
+
+    # 1. Retrieve candidates via SOPRetrieverTool
+    ret_res = sop_retriever_tool.run(query=query, context=ctx, top_k=5)
+    candidate_sops = ret_res.get("retrieved_sops", [])
+
+    # 2. Evaluate risk via DeterministicPolicyEngine
+    risk_assessment, matched = policy_engine.evaluate_risk(
         weather=weather,
-        activity=activity,
-        demographics=demographics,
-        timeframe=timeframe,
-        raw_query=raw_query,
+        context=ctx,
+        candidate_sops=candidate_sops,
+        raw_query=query,
     )
 
     if not matched:
         return {
+            "retrieved_sops": candidate_sops,
             "matched_sops": [],
             "active_sop": None,
+            "risk_assessment": risk_assessment.model_dump(),
             "sop_citation": "NO_SOP_APPLICABLE",
-            "execution_trace": ["Evaluated SOPs: 0 matched."],
+            "execution_trace": [f"Retrieved {len(candidate_sops)} SOP candidates -> 0 matched policy conditions."],
         }
 
     primary = matched[0]
-    citations = [f"{s['id']} ({s['title']})" for s in matched]
-    citation_str = " | ".join(citations)
+    citation_str = risk_assessment.sop_citation
 
-    trace_msg = f"Evaluated SOPs: {len(matched)} matched -> Primary: {primary['id']} [Severity: {primary['severity']}, Priority: {primary.get('priority', 0)}]"
+    trace_msg = (
+        f"Retrieved {len(candidate_sops)} SOPs -> Evaluated {len(matched)} matched -> "
+        f"Primary: {primary['id']} [Severity: {primary['severity']}, Priority: {primary.get('priority', 0)}]"
+    )
 
     return {
+        "retrieved_sops": candidate_sops,
         "matched_sops": matched,
         "active_sop": primary,
+        "risk_assessment": risk_assessment.model_dump(),
         "sop_citation": citation_str,
         "execution_trace": [trace_msg],
     }
@@ -313,7 +349,7 @@ def _format_structured_advisory_template(
     timeframe: str,
     matched: List[Dict[str, Any]],
 ) -> str:
-    """Helper to format a clinical, structured markdown advisory matching Screenshot 1."""
+    """Helper to format structured clinical markdown advisory grounded in SOP and telemetry."""
     sev = primary_sop.get("severity", "MODERATE")
     sev_badge = (
         "CRITICAL HAZARD - ACTIVITY PROHIBITED" if sev == "CRITICAL"
@@ -368,7 +404,7 @@ def _format_structured_advisory_template(
 
 
 def generate_advisory_node(state: AgentState) -> Dict[str, Any]:
-    """Synthesizes structured advisory strictly grounded in matched SOPs and live telemetry."""
+    """Generates grounded advisory using LLM or structured template grounded strictly in RiskAssessment & telemetry."""
     w = state.get("weather_data", {})
     matched = state.get("matched_sops", [])
     primary_sop = state.get("active_sop", matched[0] if matched else {})
@@ -377,55 +413,73 @@ def generate_advisory_node(state: AgentState) -> Dict[str, Any]:
     act = state.get("activity") or "outdoor activity"
     retry_count = state.get("retry_count", 0)
 
-    # 100% Guaranteed formal clinical structured markdown advisory
-    response_text = _format_structured_advisory_template(
-        primary_sop=primary_sop,
-        weather=w,
-        loc=loc,
-        act=act,
-        timeframe=timeframe,
-        matched=matched,
-    )
+    # 1. Try grounded LLM generation
+    llm_provider = get_llm_for_task("generation")
+    response_text = None
+
+    if llm_provider and llm_provider.chat_model:
+        try:
+            risk_dict = state.get("risk_assessment") or {}
+            user_msg = (
+                f"User Context -> Activity: {act}, Location: {loc}, Timeframe: {timeframe}\n"
+                f"Verified Telemetry -> Temp: {w.get('temperature_2m')}°C, Rain: {w.get('precipitation')}mm ({w.get('precipitation_probability')}%), Wind: {w.get('wind_speed_10m')}km/h, UV: {w.get('uv_index')}, Conditions: {w.get('weather_description')}\n"
+                f"RiskAssessment -> {json.dumps(risk_dict)}\n"
+                f"Primary SOP -> ID: {primary_sop.get('id')}, Title: '{primary_sop.get('title')}', Severity: {primary_sop.get('severity')}\n"
+                f"Guidance -> {primary_sop.get('guidance')}\n"
+                f"Precautions -> {json.dumps(primary_sop.get('precautions', []))}"
+            )
+            response_text = llm_provider.generate(
+                system_prompt=ADVISORY_GENERATION_SYSTEM_PROMPT,
+                user_message=user_msg,
+            )
+        except Exception as e:
+            print(f"[generate_advisory_node] LLM generation error: {e}. Using golden clinical template.")
+
+    # 2. Fallback to 100% verified clinical markdown advisory template
+    if not response_text or len(response_text.strip()) < 30 or primary_sop.get("id") not in response_text:
+        response_text = _format_structured_advisory_template(
+            primary_sop=primary_sop,
+            weather=w,
+            loc=loc,
+            act=act,
+            timeframe=timeframe,
+            matched=matched,
+        )
 
     return {
         "final_response": response_text,
         "route": "generate_advisory",
-        "execution_trace": [f"Generated formal clinical structured advisory (attempt={retry_count}) citing {primary_sop['id']}"],
+        "execution_trace": [f"Generated advisory (attempt={retry_count}) citing {primary_sop.get('id')}"],
     }
 
 
 def validate_grounding_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Defensive guardrail: checks whether the response cites the matched SOP ID,
-    does not hallucinate divergent numbers, and respects organizational policy.
-    """
+    """Executes OutputGuardrailPipeline verifying grounding, numeric consistency, and policy alignment."""
     response = state.get("final_response", "")
     primary = state.get("active_sop")
+    matched = state.get("matched_sops", [])
     weather = state.get("weather_data") or {}
+    risk_dict = state.get("risk_assessment")
+    risk_assessment = RiskAssessment(**risk_dict) if risk_dict else None
     retry_count = state.get("retry_count", 0)
 
+    overall_passed, check_results = output_guardrail_pipeline.validate_output(
+        response_text=response,
+        risk_assessment=risk_assessment,
+        matched_sops=matched if matched else ([primary] if primary else []),
+        telemetry=weather,
+    )
+
     errors = []
+    for r in check_results:
+        if not r.passed:
+            errors.extend(r.violations)
 
-    # 1. SOP Citation Check
-    if primary and primary.get("id"):
-        sop_id = primary["id"]
-        if sop_id not in response:
-            errors.append(f"Missing mandatory policy citation '{sop_id}' in output.")
-
-    # 2. Anti-Hallucination & Jailbreak Check
-    if "SOP-999" in response or "100% safe" in response.lower() and primary and primary.get("severity") in ("CRITICAL", "HIGH"):
-        errors.append("Output contains ungrounded/adversarial safety claims.")
-
-    # 3. Structural Clinical Format Check
-    if any(chatty in response.lower()[:120] for chatty in ["happy to help", "i'm happy", "i'd be happy", "sure, i can"]):
-        errors.append("Output contains conversational filler instead of formal clinical structure.")
-
-    is_valid = len(errors) == 0
-
-    if is_valid:
+    if overall_passed:
         return {
             "grounding_valid": True,
             "grounding_errors": [],
+            "guardrail_results": [c.model_dump() for c in check_results],
             "execution_trace": ["Guardrail Check: PASSED (Strictly grounded in SOP & API numbers)."],
             "messages": [{"role": "assistant", "content": response}],
         }
@@ -434,18 +488,14 @@ def validate_grounding_node(state: AgentState) -> Dict[str, Any]:
         return {
             "grounding_valid": False,
             "grounding_errors": errors,
+            "guardrail_results": [c.model_dump() for c in check_results],
             "retry_count": new_retry,
             "execution_trace": [f"Guardrail Check: FAILED ({errors}), incrementing retry_count={new_retry}"],
         }
 
 
 def check_grounding_condition(state: AgentState) -> str:
-    """
-    Conditional routing for guardrail validation:
-    - If valid -> end turn
-    - If invalid & retry < 2 -> loop back to generate_advisory with correction
-    - If invalid & retry >= 2 -> deterministic fallback
-    """
+    """Conditional routing for guardrail validation."""
     if state.get("grounding_valid", True):
         return "passed"
     elif state.get("retry_count", 0) < 2:
@@ -455,10 +505,7 @@ def check_grounding_condition(state: AgentState) -> str:
 
 
 def deterministic_fallback_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Deterministic safety fallback: when LLM output violates guardrails,
-    this node discards the output and delivers a 100% verified template.
-    """
+    """Deterministic safety fallback: delivers 100% verified golden clinical template when LLM fails guardrails."""
     w = state.get("weather_data", {})
     matched = state.get("matched_sops", [])
     primary_sop = state.get("active_sop", matched[0] if matched else {})

@@ -12,8 +12,9 @@ if str(ROOT_DIR) not in sys.path:
 
 import streamlit as st
 from src.graph import run_agent_turn
-from src.sop_engine import SOPEngine, SOPS_FILE_PATH
-from src.weather import get_weather_description
+from src.policy.loader import PolicyLoader
+from src.config import SOPS_FILE_PATH
+from src.tools.weather import get_weather_description
 from src.db import (
     list_all_sessions,
     get_session_messages,
@@ -24,8 +25,8 @@ from src.db import (
 
 # Page configuration
 st.set_page_config(
-    page_title="CliniGuard | Clinical Weather-Advisory System",
-    page_icon="🌦️",
+    page_title="CliniGuard | Agentic Environmental Safety System",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -171,15 +172,6 @@ st.markdown(
         font-size: 0.85rem !important;
         border-bottom: 1px solid #1E293B !important;
     }
-    
-    /* Session card in sidebar */
-    .session-item-active {
-        background: #0F172A;
-        border-left: 3px solid #0EA5E9;
-        padding: 0.5rem 0.7rem;
-        border-radius: 4px;
-        margin-bottom: 0.4rem;
-    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -218,7 +210,7 @@ if "chat_history" not in st.session_state:
 if "last_state" not in st.session_state:
     st.session_state.last_state = None
 
-sop_engine = SOPEngine()
+policy_loader = PolicyLoader()
 
 # ==========================================
 # SIDEBAR: PERSISTENCE & POLICY MANAGEMENT
@@ -227,7 +219,6 @@ with st.sidebar:
     st.markdown("### 🗄️ Consultation Sessions")
     st.caption("Persistent SQLite consultation history")
 
-    # Action: Create New Session
     if st.button("➕ New Consultation", use_container_width=True, type="primary"):
         new_sid = f"session-{int(time.time())}"
         st.session_state.session_id = new_sid
@@ -235,7 +226,6 @@ with st.sidebar:
         st.session_state.last_state = None
         st.rerun()
 
-    # Re-fetch latest sessions from SQLite to ensure titles are fresh
     saved_sessions = list_all_sessions()
     session_options = {s["session_id"]: s["title"] for s in saved_sessions}
     
@@ -259,7 +249,6 @@ with st.sidebar:
         load_session_state(selected_sid)
         st.rerun()
 
-    # Delete & Clear Actions
     col_del1, col_del2 = st.columns(2)
     if col_del1.button("🗑️ Delete Session", use_container_width=True):
         delete_session(st.session_state.session_id)
@@ -284,7 +273,7 @@ with st.sidebar:
 
     # Active Policy Catalog
     st.markdown("### 📚 Clinical SOP Catalog")
-    sops = sop_engine.load_sops(force_reload=True)
+    sops = policy_loader.load_policies(force_reload=True)
     st.caption(f"**{len(sops)} active Standard Operating Procedures** loaded")
 
     with st.expander("🔍 View All Clinical Policies", expanded=False):
@@ -344,11 +333,11 @@ st.markdown(
     f"""
     <div class='clinical-header-container'>
         <div>
-            <div class='clinical-title'>🛡️ CliniGuard | Clinical Weather-Advisory System</div>
-            <div class='clinical-subtitle'>Safety-critical outdoor activity guidance strictly grounded in authorized SOPs & live Open-Meteo meteorological telemetry.</div>
+            <div class='clinical-title'>🛡️ CliniGuard | Production Agentic AI Environmental Advisory</div>
+            <div class='clinical-subtitle'>Hybrid LLM reasoning + deterministic policy enforcement strictly grounded in Open-Meteo telemetry & clinical SOPs.</div>
         </div>
         <div style='text-align: right;'>
-            <div class='system-status-badge'>🟢 SYSTEM ONLINE & PERSISTENT</div>
+            <div class='system-status-badge'>🟢 AGENTIC PIPELINE ONLINE</div>
             <div style='font-size: 0.72rem; color: #64748B; margin-top: 0.3rem;'>Session: <code>{st.session_state.session_id}</code></div>
         </div>
     </div>
@@ -356,14 +345,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Layout: 62% Chat & Advisory Stream | 38% Telemetry & Decision Inspector
 col_stream, col_inspector = st.columns([13, 8])
 
 # ==========================================
 # RIGHT PANEL: TELEMETRY & DECISION CENTER
 # ==========================================
 with col_inspector:
-    tab_telemetry, tab_policy, tab_trace = st.tabs(["📡 Live Telemetry", "📋 Governing Policy", "🧠 Graph Trace"])
+    tab_telemetry, tab_policy, tab_retrieval, tab_guardrails, tab_trace = st.tabs(
+        ["📡 Live Telemetry", "📋 Risk Engine", "🔎 Semantic SOPs", "🛡️ Guardrails", "🧠 Agent Trace"]
+    )
     
     last_state = st.session_state.last_state
     weather = last_state.get("weather_data") if last_state else None
@@ -421,6 +411,7 @@ with col_inspector:
             citation = last_state.get("sop_citation", "None")
             matched = last_state.get("matched_sops", [])
             primary = last_state.get("active_sop") or (matched[0] if matched else None)
+            risk_dict = last_state.get("risk_assessment")
             
             if primary:
                 sev = primary.get("severity", "LOW")
@@ -444,12 +435,36 @@ with col_inspector:
         else:
             st.caption("Policy compliance evaluation will display here.")
 
+    with tab_retrieval:
+        if last_state and last_state.get("retrieved_sops"):
+            sops_retrieved = last_state.get("retrieved_sops", [])
+            st.markdown(f"**Retrieved {len(sops_retrieved)} SOP Candidates via Vector Search:**")
+            for s in sops_retrieved:
+                score = s.get("similarity_score", "N/A")
+                st.markdown(f"- **`{s.get('id')}`** (*Score: {score}*): {s.get('title')}")
+        else:
+            st.caption("Semantic vector search results will display here.")
+
+    with tab_guardrails:
+        if last_state:
+            g_valid = last_state.get("grounding_valid", True)
+            inp_valid = last_state.get("input_guardrail_passed", True)
+            g_results = last_state.get("guardrail_results", [])
+
+            st.markdown(f"**Input Security Guardrail:** `{'PASSED' if inp_valid else 'BLOCKED'}`")
+            st.markdown(f"**Output Grounding & Numeric Verification:** `{'PASSED' if g_valid else 'RETRY/FALLBACK'}`")
+            
+            if g_results:
+                st.markdown("**Guardrail Inspection Log:**")
+                for gr in g_results:
+                    st.code(f"[{gr.get('guardrail_type', 'guardrail').upper()}] Passed={gr.get('passed')} -> {gr.get('details')}", language="text")
+        else:
+            st.caption("Layered input & output guardrail check results will render here.")
+
     with tab_trace:
         if last_state:
             route = last_state.get("route", "N/A")
             st.markdown(f"**Graph Routing Path:** `{route}`")
-            st.markdown(f"**Guardrail Grounding Status:** `{'PASSED' if last_state.get('grounding_valid', True) else 'FAILED'}`")
-            
             trace_items = last_state.get("execution_trace", [])
             if trace_items:
                 st.markdown("**Execution Step Trace:**")
@@ -464,12 +479,10 @@ with col_inspector:
 with col_stream:
     st.markdown("### 💬 Clinical Advisory Stream")
     
-    # Render Chat History
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"], avatar="🧑‍💼" if msg["role"] == "user" else "🛡️"):
             st.markdown(msg["content"])
 
-    # Example Starter Chips
     if len(st.session_state.chat_history) == 0:
         st.caption("Select a sample consultation scenario to begin:")
         c1, c2, c3 = st.columns(3)
@@ -480,19 +493,16 @@ with col_stream:
         if c3.button("🧒 Toddler Park in Jaipur", use_container_width=True):
             st.session_state.sample_input = "Is it safe to take my 3-year-old toddler to the playground in Jaipur today?"
 
-    # Chat Input Box
     default_text = st.session_state.pop("sample_input", None)
     prompt = st.chat_input("Enter your activity & location (e.g., 'Is it safe to cycle in Bhopal today?')") or default_text
 
     if prompt:
-        # Display User Input
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑‍💼"):
             st.markdown(prompt)
 
-        # Process through LangGraph Workflow
         with st.chat_message("assistant", avatar="🛡️"):
-            with st.spinner("Fetching live meteorological telemetry & evaluating clinical SOPs..."):
+            with st.spinner("Executing Agentic Pipeline (NLU → Vector Retrieval → Policy Engine → Guardrails)..."):
                 response_dict = run_agent_turn(
                     user_query=prompt,
                     session_id=st.session_state.session_id,
@@ -500,7 +510,6 @@ with col_stream:
                 final_text = response_dict.get("final_response", "No advisory generated.")
                 st.markdown(final_text)
                 
-                # Synchronize full state from SQLite persistence
                 st.session_state.last_state = response_dict
                 load_session_state(st.session_state.session_id)
                 st.rerun()
