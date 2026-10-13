@@ -1,0 +1,437 @@
+[
+  {
+    "id": "SOP-OVERRIDE-001",
+    "title": "Severe Cyclonic Circulation & Monsoonal Heavy Rainfall Override",
+    "category": "severe_override",
+    "target_activities": ["*"],
+    "target_demographics": ["all"],
+    "severity": "CRITICAL",
+    "priority": 100,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "precipitation",
+          "op": ">=",
+          "value": 15.0
+        },
+        {
+          "field": "weather_code",
+          "op": "in",
+          "value": [65, 67, 82, 95, 96, 99]
+        },
+        {
+          "type": "composite",
+          "operator": "AND",
+          "rules": [
+            {
+              "field": "precipitation_probability",
+              "op": ">=",
+              "value": 80
+            },
+            {
+              "field": "precipitation",
+              "op": ">=",
+              "value": 7.5
+            },
+            {
+              "field": "wind_speed_10m",
+              "op": ">=",
+              "value": 35.0
+            }
+          ]
+        }
+      ]
+    },
+    "advisory_lead": "IMD/Active Low-Pressure Weather Alert: An active low-pressure / severe monsoonal weather system is bringing intense precipitation and turbulent squally winds to the region.",
+    "guidance": "Treat all outdoor activities as high severity risk regardless of category. Strongly advise postponing non-essential outdoor travel and open-air activities until the convective rain system clears.",
+    "precautions": [
+      "Avoid all outdoor cycling, two-wheeler travel, and open-field activities",
+      "Watch for urban waterlogging, localized flooding, and squally gusts",
+      "Monitor official India Meteorological Department (IMD) / local disaster authority bulletins"
+    ]
+  },
+  {
+    "id": "SOP-VULN-001",
+    "title": "Pediatric UV & Thermal Regulation Safety Policy",
+    "category": "vulnerable_groups",
+    "target_activities": ["park", "playground", "swings", "outdoor play", "stroller walk", "kids outdoor"],
+    "target_demographics": ["infants", "toddlers", "children", "kids", "babies"],
+    "severity": "HIGH",
+    "priority": 90,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "uv_index",
+          "op": ">=",
+          "value": 7.0
+        },
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 34.0
+        }
+      ]
+    },
+    "guidance": "Children possess higher body surface-area-to-mass ratios and immature thermoregulatory mechanisms, making them exceptionally vulnerable to rapid dehydration and playground metal equipment contact burns.",
+    "precautions": [
+      "Restrict playground activities to covered or fully shaded facilities",
+      "Test metal and dark plastic playground slide surfaces by hand before allowing children contact",
+      "Enforce broad-brimmed sun hats and mandatory 15-minute fluid intervals"
+    ]
+  },
+  {
+    "id": "SOP-EXER-001",
+    "title": "Extreme UV Radiation Advisory for Midday Outdoor Exercise",
+    "category": "outdoor_exercise",
+    "target_activities": ["cycling", "running", "jogging", "outdoor exercise", "sports", "swimming", "workout"],
+    "target_demographics": ["all", "adults", "athletes"],
+    "severity": "HIGH",
+    "priority": 85,
+    "time_window": {
+      "start_hour": 11,
+      "end_hour": 16
+    },
+    "conditions": {
+      "type": "numeric",
+      "rules": [
+        {
+          "field": "uv_index",
+          "op": ">=",
+          "value": 8.0
+        }
+      ]
+    },
+    "guidance": "High risk of acute cellular UV radiation damage and photo-keratitis during midday hours. Advise strictly against unprotected vigorous outdoor training between 11:00 AM and 4:00 PM. Recommend rescheduling high-intensity workouts to early morning (before 9:00 AM) or post-sunset.",
+    "precautions": [
+      "Apply broad-spectrum SPF 50+ sunscreen every 2 hours",
+      "Wear UV-rated polarized sunglasses and protective breathable apparel",
+      "Hydrate with electrolyte-balanced fluids before and during movement"
+    ]
+  },
+  {
+    "id": "SOP-EXER-002",
+    "title": "Squally Wind & Crosswind Hazard for Cyclists and Two-Wheelers",
+    "category": "outdoor_exercise",
+    "target_activities": ["cycling", "biking", "two-wheeler", "scooter", "motorcycle", "skating"],
+    "target_demographics": ["all"],
+    "severity": "HIGH",
+    "priority": 85,
+    "conditions": {
+      "type": "numeric",
+      "rules": [
+        {
+          "field": "wind_speed_10m",
+          "op": ">=",
+          "value": 40.0
+        }
+      ]
+    },
+    "guidance": "Wind speeds exceeding 40 km/h present direct mechanical stability hazards for cyclists and two-wheeler operators due to sudden crosswind gusts, lateral vehicle displacement, and falling debris. Flag as a significant safety risk rather than a mere comfort issue.",
+    "precautions": [
+      "Avoid elevated overpasses, coastal highways, and open corridors prone to wind tunneling",
+      "Reduce riding speed by at least 30-50% if transit is unavoidable",
+      "Consider shifting to enclosed four-wheeler transit or metro"
+    ]
+  },
+  {
+    "id": "SOP-LEISURE-002",
+    "title": "Sub-Freezing & Frostbite Risk for Outdoor Exposure",
+    "category": "outdoor_exercise",
+    "target_activities": ["hiking", "trekking", "camping", "walking", "outdoor sports"],
+    "target_demographics": ["all"],
+    "severity": "HIGH",
+    "priority": 85,
+    "conditions": {
+      "type": "numeric",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": "<=",
+          "value": 0.0
+        }
+      ]
+    },
+    "guidance": "Sub-zero temperatures with wind chill dramatically accelerate peripheral hypothermia and frostbite on exposed extremities within 30 minutes of stationary exposure.",
+    "precautions": [
+      "Dress in modular three-layer thermal insulation with windproof outer shell",
+      "Keep extremities (fingers, toes, ears, nose) insulated with moisture-wicking wool or synthetic fiber",
+      "Consume warm, calorie-dense sustenance and warm fluids regularly"
+    ]
+  },
+  {
+    "id": "SOP-COMM-002",
+    "title": "Dense Fog & Severe Visibility Reduction for Highway Travel",
+    "category": "travel_commute",
+    "target_activities": ["travel", "highway driving", "long drive", "road trip", "commute", "driving"],
+    "target_demographics": ["all", "drivers"],
+    "severity": "HIGH",
+    "priority": 80,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "weather_code",
+          "op": "in",
+          "value": [45, 48]
+        },
+        {
+          "type": "composite",
+          "operator": "AND",
+          "rules": [
+            {
+              "field": "relative_humidity_2m",
+              "op": ">=",
+              "value": 90
+            },
+            {
+              "field": "temperature_2m",
+              "op": "<=",
+              "value": 12.0
+            },
+            {
+              "field": "wind_speed_10m",
+              "op": "<=",
+              "value": 8.0
+            }
+          ]
+        }
+      ]
+    },
+    "guidance": "Atmospheric conditions favor dense radiative or advection fog causing acute optical attenuation. Advise postponing non-urgent highway transit until atmospheric mixing improves visibility.",
+    "precautions": [
+      "Operate vehicles exclusively with low-beam headlights and dedicated fog lamps; do not use high-beams",
+      "Utilize lane guide markings on the roadway shoulder rather than center lines",
+      "Avoid sudden braking and maintain dual-hazard flashers if pulling onto the shoulder"
+    ]
+  },
+  {
+    "id": "SOP-EXER-003",
+    "title": "Heat Stress & Exertional Heat Exhaustion Warning",
+    "category": "outdoor_exercise",
+    "target_activities": ["running", "jogging", "football", "cricket", "marathon", "outdoor exercise", "hiking"],
+    "target_demographics": ["all"],
+    "severity": "HIGH",
+    "priority": 75,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "apparent_temperature",
+          "op": ">=",
+          "value": 38.0
+        },
+        {
+          "type": "composite",
+          "operator": "AND",
+          "rules": [
+            {
+              "field": "temperature_2m",
+              "op": ">=",
+              "value": 35.0
+            },
+            {
+              "field": "relative_humidity_2m",
+              "op": ">=",
+              "value": 65
+            }
+          ]
+        }
+      ]
+    },
+    "guidance": "Severe heat index condition where evaporative cooling through perspiration is severely impaired, elevating the risk of exertional heat exhaustion and heat stroke. Strongly discourage continuous outdoor endurance cardio.",
+    "precautions": [
+      "Limit continuous outdoor exertion to under 20 minutes with mandatory shade breaks",
+      "Pre-cool body and maintain continuous cold fluid intake",
+      "Watch for warning signs: dizziness, nausea, cessation of sweating, or muscle cramps"
+    ]
+  },
+  {
+    "id": "SOP-VULN-002",
+    "title": "Senior & Cardiovascular Thermal Stress Protocol",
+    "category": "vulnerable_groups",
+    "target_activities": ["morning walk", "evening walk", "gardening", "temple visit", "leisure walk"],
+    "target_demographics": ["elderly", "seniors", "grandparents", "cardiac patients", "hypertensive"],
+    "severity": "MODERATE",
+    "priority": 75,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 33.0
+        },
+        {
+          "field": "temperature_2m",
+          "op": "<=",
+          "value": 10.0
+        }
+      ]
+    },
+    "guidance": "Extreme ambient thermal fluctuations impose excessive cardiac workload and vascular constriction or dehydration in elderly individuals and those with cardiovascular vulnerabilities.",
+    "precautions": [
+      "Confine routine walks to temperature-controlled indoor tracks or climate-buffered hours",
+      "Carry prescribed emergency medications and a companion communication device",
+      "Monitor for orthostatic hypotension or shortness of breath"
+    ]
+  },
+  {
+    "id": "SOP-VULN-003",
+    "title": "Canine Pavement Hyperthermia & Paw Pad Safety",
+    "category": "vulnerable_groups",
+    "target_activities": ["dog walking", "pet walk", "dog training", "taking pet out", "walking", "stroll"],
+    "target_demographics": ["pets", "dogs", "animals"],
+    "severity": "MODERATE",
+    "priority": 70,
+    "conditions": {
+      "type": "numeric",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 31.0
+        }
+      ]
+    },
+    "guidance": "Asphalt and concrete surface temperatures can exceed ambient air temperature by 15°C-25°C under direct solar radiation, causing immediate second-degree paw pad burns and canine heat exhaustion.",
+    "precautions": [
+      "Perform the 7-second back-of-hand test on asphalt before walking dogs",
+      "Restrict walks to grassy parks, shaded dirt trails, or early dawn hours",
+      "Carry portable pet hydration and avoid muzzling that restricts panting"
+    ]
+  },
+  {
+    "id": "SOP-COMM-003",
+    "title": "Pedestrian Waterlogging & Electrical Hazard Precaution",
+    "category": "travel_commute",
+    "target_activities": ["walking", "pedestrian", "walk to work", "transit walk", "errands"],
+    "target_demographics": ["pedestrians", "all"],
+    "severity": "MODERATE",
+    "priority": 65,
+    "conditions": {
+      "type": "numeric",
+      "rules": [
+        {
+          "field": "precipitation",
+          "op": ">=",
+          "value": 5.0
+        }
+      ]
+    },
+    "guidance": "Sustained rainfall leads to submerged curbs, open utility hazards, and potential electrical leakage around municipal transformer poles and streetlights.",
+    "precautions": [
+      "Wear waterproof anti-skid footwear with ankle support",
+      "Avoid wading through opaque standing water of unknown depth",
+      "Stay strictly clear of downed utility wires, submerged electrical junctions, and metal lamp posts"
+    ]
+  },
+  {
+    "id": "SOP-COMM-001",
+    "title": "Precipitation & Low-Traction Warning for Two-Wheeler Commute",
+    "category": "travel_commute",
+    "target_activities": ["two-wheeler", "scooter", "motorcycle", "bike commute", "daily commute", "travel", "driving"],
+    "target_demographics": ["commuters", "all"],
+    "severity": "MODERATE",
+    "priority": 60,
+    "conditions": {
+      "type": "composite",
+      "operator": "AND",
+      "rules": [
+        {
+          "field": "precipitation_probability",
+          "op": ">=",
+          "value": 70
+        },
+        {
+          "field": "precipitation",
+          "op": "<",
+          "value": 15.0
+        }
+      ]
+    },
+    "guidance": "High probability of rain creates reduced roadway friction, hydroplaning risks, and diminished visor visibility. Warn commuters of potential traffic delays and braking distance degradation.",
+    "precautions": [
+      "Increase following distance to at least 4-5 seconds behind leading vehicles",
+      "Inspect tire tread depth and headlight illumination prior to departure",
+      "Check live transit and localized waterlogging alerts before leaving"
+    ]
+  },
+  {
+    "id": "SOP-LEISURE-001",
+    "title": "Outdoor Picnic & Leisure Composite Comfort Index",
+    "category": "outdoor_leisure",
+    "target_activities": ["picnic", "park outing", "barbecue", "outdoor lunch", "garden party", "family outing"],
+    "target_demographics": ["all", "families"],
+    "severity": "LOW",
+    "priority": 30,
+    "conditions": {
+      "type": "fuzzy_comfort",
+      "evaluation": {
+        "ideal_temp_min": 18.0,
+        "ideal_temp_max": 28.0,
+        "max_rain_probability": 30,
+        "max_rain_amount": 0.5,
+        "max_wind_speed": 22.0,
+        "max_uv_index": 7.0
+      }
+    },
+    "guidance": "Composite recreational comfort assessment evaluated across thermal moderation, atmospheric stability, cloud shelter, and precipitation risk. When metrics align within comfort tolerances, conditions are highly suitable for outdoor leisure and dining.",
+    "precautions": [
+      "Set up picnic seating beneath natural canopy or portable gazebo",
+      "Keep perishable food items stored in insulated cold coolers",
+      "Have a secondary indoor contingency plan if localized convective showers develop"
+    ]
+  },
+  {
+    "id": "SOP-EXER-004",
+    "title": "Optimal Weather Advisory for Outdoor Physical Training",
+    "category": "outdoor_exercise",
+    "target_activities": ["cycling", "running", "jogging", "walking", "outdoor exercise", "sports", "workout"],
+    "target_demographics": ["all"],
+    "severity": "LOW",
+    "priority": 20,
+    "conditions": {
+      "type": "composite",
+      "operator": "AND",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 16.0
+        },
+        {
+          "field": "temperature_2m",
+          "op": "<=",
+          "value": 27.0
+        },
+        {
+          "field": "wind_speed_10m",
+          "op": "<=",
+          "value": 25.0
+        },
+        {
+          "field": "precipitation_probability",
+          "op": "<=",
+          "value": 20
+        },
+        {
+          "field": "uv_index",
+          "op": "<=",
+          "value": 6.0
+        }
+      ]
+    },
+    "guidance": "Favorable, safe conditions for outdoor cardiovascular training, cycling, and general fitness activities with minimal environmental stress.",
+    "precautions": [
+      "Maintain routine hydration",
+      "Standard baseline warm-up and cool-down protocols apply"
+    ]
+  }
+]
