@@ -31,6 +31,7 @@ DEMOGRAPHIC_SYNONYMS = {
     "elderly": ["elderly", "senior", "seniors", "grandparents", "grandfather", "grandmother", "dada", "dadi", "nana", "nani", "cardiac", "heart patient"],
     "pets": ["pet", "pets", "dog", "dogs", "puppy", "pup", "cat", "animal", "canine", "retriever"],
     "athletes": ["athlete", "athletes", "runner", "cyclist", "training"],
+    "pregnant": ["pregnant", "pregnancy", "expectant", "expecting", "prenatal", "maternity", "third trimester", "second trimester"],
 }
 
 
@@ -51,7 +52,16 @@ class DeterministicPolicyEngine:
         Evaluates active SOPs against weather telemetry and context.
         Returns (RiskAssessment_pydantic_object, matched_sops_list).
         """
-        all_sops = candidate_sops if candidate_sops is not None else self.loader.load_policies()
+        if candidate_sops is not None:
+            # Ensure severe-weather override policies are always included in the evaluation pool
+            override_sops = self.loader.load_override_policies()
+            candidate_ids = {s.get("id") for s in candidate_sops if isinstance(s, dict) and s.get("id")}
+            all_sops = list(candidate_sops) + [
+                s for s in override_sops if s.get("id") not in candidate_ids
+            ]
+        else:
+            all_sops = self.loader.load_policies()
+
         matched: List[Dict[str, Any]] = []
 
         query_lower = (raw_query or "").lower()
@@ -88,8 +98,11 @@ class DeterministicPolicyEngine:
                 matched_sop["severity_rank"] = SEVERITY_RANKS.get(sop.get("severity", "LOW"), 1)
                 matched.append(matched_sop)
 
-        # Sort by severity rank descending (CRITICAL -> HIGH -> MODERATE -> LOW)
-        matched.sort(key=lambda s: s["severity_rank"], reverse=True)
+        # Sort by severity rank descending, then priority descending
+        matched.sort(
+            key=lambda s: (s["severity_rank"], s.get("priority", 0)),
+            reverse=True,
+        )
 
         if not matched:
             return (

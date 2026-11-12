@@ -4,6 +4,10 @@ from typing import Type, TypeVar, Optional, Any, Dict, List
 from pydantic import BaseModel
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage
+from src.observability import get_logger
+
+logger = get_logger("llm_provider")
+
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -60,7 +64,7 @@ class LLMProvider:
                 parsed_json = json.loads(raw_text)
                 return schema.model_validate(parsed_json)
             except Exception as parse_err:
-                print(f"[LLMProvider] Structured extraction failed: {parse_err}. Using fallback factory if available.")
+                logger.warning("Structured extraction failed: %s. Using fallback factory if available.", parse_err)
                 if fallback_factory:
                     return fallback_factory()
                 raise parse_err

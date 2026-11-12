@@ -433,5 +433,185 @@
       "Maintain routine hydration",
       "Standard baseline warm-up and cool-down protocols apply"
     ]
+  },
+  {
+    "id": "SOP-EXER-005",
+    "title": "High Humidity Heat-Index Danger for Outdoor Activity",
+    "category": "outdoor_exercise",
+    "target_activities": ["running", "jogging", "cycling", "walking", "outdoor exercise", "sports", "workout", "hiking"],
+    "target_demographics": ["all"],
+    "severity": "HIGH",
+    "priority": 78,
+    "conditions": {
+      "type": "composite",
+      "operator": "AND",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 30.0
+        },
+        {
+          "field": "relative_humidity_2m",
+          "op": ">=",
+          "value": 75
+        }
+      ]
+    },
+    "guidance": "High ambient humidity severely impairs the body's primary thermoregulatory mechanism (sweat evaporation), dramatically increasing the risk of heat stroke even at moderate ambient temperatures. The wet-bulb globe temperature (WBGT) is dangerously elevated.",
+    "precautions": [
+      "Reschedule strenuous outdoor activity to cooler, less humid periods (pre-dawn or post-sunset)",
+      "Wear moisture-wicking, breathable clothing; avoid dark or heavy fabrics",
+      "Drink 500ml of water or electrolyte drink 30 minutes before going out and every 20 minutes during activity",
+      "Stop immediately if you experience dizziness, cessation of sweating, or muscle cramps — these are heat-stroke warning signs"
+    ]
+  },
+  {
+    "id": "SOP-NITE-001",
+    "title": "Night-Time Outdoor Activity Safety Protocol",
+    "category": "outdoor_exercise",
+    "target_activities": ["running", "cycling", "walking", "jogging", "dog walking", "outdoor exercise"],
+    "target_demographics": ["all"],
+    "severity": "MODERATE",
+    "priority": 55,
+    "time_window": {
+      "start_hour": 21,
+      "end_hour": 5
+    },
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": "<=",
+          "value": 15.0
+        },
+        {
+          "field": "relative_humidity_2m",
+          "op": ">=",
+          "value": 85
+        }
+      ]
+    },
+    "guidance": "Night-time outdoor activities carry additional risks: reduced driver visibility, compromised personal safety, disorienting fog or dew, and rapid temperature drops that are masked by the body's exertion heat.",
+    "precautions": [
+      "Wear high-visibility or reflective clothing / LED armbands",
+      "Run or cycle against traffic flow on roads without a dedicated lane",
+      "Carry a charged mobile phone; share your route with a trusted contact",
+      "Be aware that ambient temperature can drop 5-8°C after midnight — carry a light thermal layer"
+    ]
+  },
+  {
+    "id": "SOP-VULN-004",
+    "title": "Pregnancy Outdoor Thermal & Exertion Safety Policy",
+    "category": "vulnerable_groups",
+    "target_activities": ["walking", "morning walk", "outdoor exercise", "running", "yoga", "swimming", "cycling"],
+    "target_demographics": ["pregnant", "pregnancy", "expectant mother"],
+    "severity": "MODERATE",
+    "priority": 72,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": ">=",
+          "value": 32.0
+        },
+        {
+          "field": "apparent_temperature",
+          "op": ">=",
+          "value": 34.0
+        },
+        {
+          "field": "uv_index",
+          "op": ">=",
+          "value": 7.0
+        }
+      ]
+    },
+    "guidance": "Pregnancy increases basal metabolic rate and core body temperature. Maternal hyperthermia (core temp > 39°C) is associated with adverse foetal neurological outcomes. Heat dissipation is significantly reduced in the third trimester due to circulatory redistribution.",
+    "precautions": [
+      "Limit outdoor activity sessions to under 30 minutes; immediately return indoors if feeling overheated",
+      "Hydrate with 250ml of water every 15 minutes during outdoor activity",
+      "Avoid direct sun exposure between 10:00 AM and 5:00 PM on high UV days",
+      "Consult your obstetrician before commencing new outdoor exercise routines during third trimester"
+    ]
+  },
+  {
+    "id": "SOP-LEISURE-003",
+    "title": "Wind Chill Hypothermia Risk for Extended Outdoor Exposure",
+    "category": "outdoor_exercise",
+    "target_activities": ["hiking", "trekking", "cycling", "running", "outdoor exercise", "walking", "camping"],
+    "target_demographics": ["all"],
+    "severity": "HIGH",
+    "priority": 82,
+    "conditions": {
+      "type": "composite",
+      "operator": "AND",
+      "rules": [
+        {
+          "field": "temperature_2m",
+          "op": "<=",
+          "value": 10.0
+        },
+        {
+          "field": "wind_speed_10m",
+          "op": ">=",
+          "value": 25.0
+        }
+      ]
+    },
+    "guidance": "Wind chill (feels-like temperature below 5°C) dramatically accelerates conductive heat loss from exposed skin, increasing hypothermia risk even when ambient air temperature is above freezing. Cyclists and hikers are at heightened risk due to sustained wind exposure.",
+    "precautions": [
+      "Wear a windproof outer shell layer over moisture-wicking thermal base layers",
+      "Cover neck, ears, and hands — highest peripheral heat-loss zones",
+      "Reduce planned outdoor duration by 30% compared to calm conditions at the same temperature",
+      "Carry an emergency thermal blanket on hikes exceeding 2 hours in such conditions"
+    ]
+  },
+  {
+    "id": "SOP-OVERRIDE-002",
+    "title": "Snow, Frost & Ice — Severe Outdoor Traction & Exposure Hazard",
+    "category": "severe_override",
+    "target_activities": ["cycling", "running", "walking", "hiking", "trekking", "two-wheeler", "driving", "outdoor exercise"],
+    "target_demographics": ["all"],
+    "severity": "CRITICAL",
+    "priority": 95,
+    "conditions": {
+      "type": "composite",
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "weather_code",
+          "op": "in",
+          "value": [71, 73, 75, 77, 85, 86]
+        },
+        {
+          "type": "composite",
+          "operator": "AND",
+          "rules": [
+            {
+              "field": "temperature_2m",
+              "op": "<=",
+              "value": 2.0
+            },
+            {
+              "field": "relative_humidity_2m",
+              "op": ">=",
+              "value": 80
+            }
+          ]
+        }
+      ]
+    },
+    "guidance": "Active snowfall or near-freezing humid conditions create black-ice hazards on road and footpath surfaces. Frostbite onset on exposed skin can occur within 10-30 minutes in windy sub-zero conditions.",
+    "precautions": [
+      "Treat all road and footpath surfaces as potentially icy — reduce speed significantly or postpone travel",
+      "Use anti-slip footwear with grooved rubber soles; avoid smooth-soled shoes on any outdoor surface",
+      "Cover all exposed skin; frostbite affects fingers, toes, nose, and ears first",
+      "Do not operate two-wheelers on snow or ice-covered roads — switch to enclosed transport"
+    ]
   }
 ]

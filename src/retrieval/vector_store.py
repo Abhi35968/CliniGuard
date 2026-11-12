@@ -28,6 +28,10 @@ class VectorStore:
     def __init__(self):
         self.records: List[VectorStoreRecord] = []
 
+    def clear(self) -> None:
+        """Clears all records from the vector store."""
+        self.records = []
+
     def add_documents(
         self,
         doc_ids: List[str],
@@ -44,12 +48,16 @@ class VectorStore:
         query_vector: List[float],
         top_k: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None,
+        min_score: Optional[float] = None,
     ) -> List[Tuple[Dict[str, Any], float]]:
         """
-        Performs vector similarity search filtered by metadata.
+        Performs vector similarity search filtered by metadata and optional minimum score.
         Returns list of (metadata_dict, similarity_score).
         """
         results: List[Tuple[Dict[str, Any], float]] = []
+
+        if not query_vector or not self.records:
+            return []
 
         for record in self.records:
             # Metadata filter check
@@ -72,12 +80,12 @@ class VectorStore:
                     continue
 
             score = cosine_similarity(query_vector, record.vector)
+            if score <= 0.0:
+                continue
+            if min_score is not None and score < min_score:
+                continue
             results.append((record.metadata, score))
 
         # Sort by similarity score descending
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k]
-
-    def clear(self):
-        """Clears all indexed records."""
-        self.records.clear()

@@ -29,11 +29,14 @@ class AgentState(TypedDict):
     # Weather Telemetry
     weather_data: Optional[Dict[str, Any]]
     weather_error: Optional[str]
+    # Location disambiguation candidates (list of dicts with display_name, lat, lon, etc.)
+    location_candidates: Optional[List[Dict[str, Any]]]
 
     # SOP Policy & Risk Engine Evaluations
     retrieved_sops: List[Dict[str, Any]]
     matched_sops: List[Dict[str, Any]]
     active_sop: Optional[Dict[str, Any]]
+    retrieval_error: Optional[str]
     risk_assessment: Optional[Dict[str, Any]]
     sop_citation: Optional[str]
 

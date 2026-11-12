@@ -16,6 +16,10 @@ from src.guardrails.output import OutputGuardrailPipeline
 from src.llm.factory import get_llm_for_task
 from src.llm.prompts import ADVISORY_GENERATION_SYSTEM_PROMPT
 from src.observability.tracer import ExecutionTracer
+from src.observability import get_logger
+
+logger = get_logger("nodes")
+
 
 # Singleton component instances
 weather_tool = WeatherTool()
@@ -179,24 +183,32 @@ def fetch_weather_node(state: AgentState) -> Dict[str, Any]:
 
     res = weather_tool.run(location=location, timeframe=timeframe)
 
+    # Always propagate candidates for disambiguation UI even on error
+    candidates = res.get("location_candidates", [])
+
     if not res["success"] or not res["weather_data"]:
         err_msg = res.get("error") or f"Could not find coordinates or weather for '{location}'"
         return {
             "weather_data": None,
             "weather_error": err_msg,
+            "location_candidates": candidates,
             "execution_trace": [f"Weather Tool error: {err_msg}"],
         }
 
     weather = res["weather_data"]
+    resolved = res.get("resolved_location", {})
     trace_msg = (
         f"Weather Tool fetched for {weather['location_name']}: "
         f"Temp={weather['temperature_2m']}°C, RainProb={weather['precipitation_probability']}%, "
         f"Rain={weather['precipitation']}mm, Wind={weather['wind_speed_10m']}km/h, UV={weather['uv_index']}"
     )
+    if len(candidates) > 1:
+        trace_msg += f" | {len(candidates)} location candidates found (auto-selected most prominent)"
 
     return {
         "weather_data": weather,
         "weather_error": None,
+        "location_candidates": candidates,
         "execution_trace": [trace_msg],
     }
 
@@ -249,6 +261,7 @@ def evaluate_sops_node(state: AgentState) -> Dict[str, Any]:
     # 1. Retrieve candidates via SOPRetrieverTool
     ret_res = sop_retriever_tool.run(query=query, context=ctx, top_k=5)
     candidate_sops = ret_res.get("retrieved_sops", [])
+    retrieval_error = ret_res.get("error")
 
     # 2. Evaluate risk via DeterministicPolicyEngine
     risk_assessment, matched = policy_engine.evaluate_risk(
@@ -263,6 +276,7 @@ def evaluate_sops_node(state: AgentState) -> Dict[str, Any]:
             "retrieved_sops": candidate_sops,
             "matched_sops": [],
             "active_sop": None,
+            "retrieval_error": retrieval_error,
             "risk_assessment": risk_assessment.model_dump(),
             "sop_citation": "NO_SOP_APPLICABLE",
             "execution_trace": [f"Retrieved {len(candidate_sops)} SOP candidates -> 0 matched policy conditions."],
@@ -275,11 +289,14 @@ def evaluate_sops_node(state: AgentState) -> Dict[str, Any]:
         f"Retrieved {len(candidate_sops)} SOPs -> Evaluated {len(matched)} matched -> "
         f"Primary: {primary['id']} [Severity: {primary['severity']}, Priority: {primary.get('priority', 0)}]"
     )
+    if primary.get("category") == "severe_override" or "*" in primary.get("target_activities", []):
+        trace_msg += " [SEVERE WEATHER OVERRIDE]"
 
     return {
         "retrieved_sops": candidate_sops,
         "matched_sops": matched,
         "active_sop": primary,
+        "retrieval_error": retrieval_error,
         "risk_assessment": risk_assessment.model_dump(),
         "sop_citation": citation_str,
         "execution_trace": [trace_msg],
@@ -297,7 +314,7 @@ def check_sop_condition(state: AgentState) -> str:
 def no_sop_fallback_node(state: AgentState) -> Dict[str, Any]:
     """Honest fallback when no SOP covers the user query."""
     w = state.get("weather_data", {})
-    act = state.get("activity") or "your requested activity"
+    user_act = state.get("activity")
     loc = w.get("location_name") or state.get("location") or "your location"
     timeframe = state.get("timeframe") or "today"
     
@@ -308,8 +325,28 @@ def no_sop_fallback_node(state: AgentState) -> Dict[str, Any]:
     uv = w.get("uv_index", "N/A")
     cond = w.get("weather_description", "N/A")
 
+    if user_act:
+        header_title = f"Meteorological Assessment & Policy Notice: {user_act.title()} in {loc}"
+        policy_notice = (
+            f"CliniGuard does not currently have a formal standard operating procedure (SOP) safety policy covering **'{user_act}'** "
+            f"under these specific environmental parameters.\n\n"
+            f"- **Safety Protocol:** Because all clinical advice must strictly adhere to verified organizational policies, "
+            f"speculative recommendations without an authorized SOP are prohibited.\n"
+            f"- **Recommendation:** Please exercise individual discretion and observe local civic and meteorological bulletins."
+        )
+    else:
+        header_title = f"Meteorological Assessment & Policy Notice: Ambient Conditions in {loc}"
+        policy_notice = (
+            f"CliniGuard does not currently have a formal standard operating procedure (SOP) safety policy covering "
+            f"general ambient conditions in {loc} without an explicit target activity.\n\n"
+            f"- **Safety Protocol:** Standard general environmental precautions apply. "
+            f"To evaluate clinical thresholds for specific exposure risks (such as running, heat stress, "
+            f"cycling crosswinds, or dog walking), please specify your intended outdoor activity.\n"
+            f"- **Recommendation:** Please exercise individual discretion and observe local civic and meteorological bulletins."
+        )
+
     msg = (
-        f"### 📋 Meteorological Assessment & Policy Notice: {act.title()} in {loc}\n\n"
+        f"### 📋 {header_title}\n\n"
         f"> **STATUS: NO FORMAL SOP APPLICABLE**  \n"
         f"> **Severity Level:** `INFORMATIONAL` | **Governing Policy:** `[NO_SOP_APPLICABLE]`\n\n"
         f"#### 📊 Verified Meteorological Telemetry ({timeframe.capitalize()})\n"
@@ -322,11 +359,7 @@ def no_sop_fallback_node(state: AgentState) -> Dict[str, Any]:
         f"| **UV Index** | {uv} |\n\n"
         f"---\n\n"
         f"#### ℹ️ Clinical Policy Scope Notice\n"
-        f"CliniGuard does not currently have a formal standard operating procedure (SOP) safety policy covering **'{act}'** "
-        f"under these specific environmental parameters.\n\n"
-        f"- **Safety Protocol:** Because all clinical advice must strictly adhere to verified organizational policies, "
-        f"speculative recommendations without an authorized SOP are prohibited.\n"
-        f"- **Recommendation:** Please exercise individual discretion and observe local civic and meteorological bulletins.\n\n"
+        f"{policy_notice}\n\n"
         f"---\n"
         f"*CliniGuard Clinical & Environmental Advisory System*"
     )
@@ -433,7 +466,7 @@ def generate_advisory_node(state: AgentState) -> Dict[str, Any]:
                 user_message=user_msg,
             )
         except Exception as e:
-            print(f"[generate_advisory_node] LLM generation error: {e}. Using golden clinical template.")
+            logger.warning("LLM generation error: %s. Using golden clinical template.", e)
 
     # 2. Fallback to 100% verified clinical markdown advisory template
     if not response_text or len(response_text.strip()) < 30 or primary_sop.get("id") not in response_text:
@@ -460,7 +493,12 @@ def validate_grounding_node(state: AgentState) -> Dict[str, Any]:
     matched = state.get("matched_sops", [])
     weather = state.get("weather_data") or {}
     risk_dict = state.get("risk_assessment")
-    risk_assessment = RiskAssessment(**risk_dict) if risk_dict else None
+    if isinstance(risk_dict, RiskAssessment):
+        risk_assessment = risk_dict
+    elif isinstance(risk_dict, dict):
+        risk_assessment = RiskAssessment(**risk_dict)
+    else:
+        risk_assessment = None
     retry_count = state.get("retry_count", 0)
 
     overall_passed, check_results = output_guardrail_pipeline.validate_output(
@@ -487,6 +525,7 @@ def validate_grounding_node(state: AgentState) -> Dict[str, Any]:
         new_retry = retry_count + 1
         return {
             "grounding_valid": False,
+            "final_response": None,  # Invalidate unverified draft so rejected text cannot leak as final advisory
             "grounding_errors": errors,
             "guardrail_results": [c.model_dump() for c in check_results],
             "retry_count": new_retry,

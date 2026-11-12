@@ -3,6 +3,10 @@ import os
 from typing import List, Dict, Any, Optional
 from src.config import SOPS_FILE_PATH
 from src.policy.models import SOPDefinition
+from src.observability import get_logger
+
+logger = get_logger("policy_loader")
+
 
 
 class PolicyLoader:
@@ -27,5 +31,13 @@ class PolicyLoader:
                 self._last_mtime = mtime
             return self._raw_cache or []
         except Exception as e:
-            print(f"[PolicyLoader] Error loading policies from {self.sops_path}: {e}")
+            logger.error("Error loading policies from %s: %s", self.sops_path, e)
             return self._raw_cache or []
+
+    def load_override_policies(self, force_reload: bool = False) -> List[Dict[str, Any]]:
+        """Loads only severe-weather override policies (category='severe_override' or wildcard target_activities)."""
+        policies = self.load_policies(force_reload=force_reload)
+        return [
+            s for s in policies
+            if s.get("category") == "severe_override" or "*" in s.get("target_activities", [])
+        ]

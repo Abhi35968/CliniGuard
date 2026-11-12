@@ -15,9 +15,18 @@ class SOPRetrieverTool(BaseTool):
 
     def run(self, query: str, context: UserContext, top_k: int = 5) -> Dict[str, Any]:
         """Retrieves top-k relevant SOPs for context."""
-        sops = self.retriever.retrieve(query=query, context=context, top_k=top_k)
-        return {
-            "success": True,
-            "retrieved_sops": sops,
-            "count": len(sops),
-        }
+        try:
+            sops = self.retriever.retrieve(query=query, context=context, top_k=top_k)
+            return {
+                "success": True,
+                "retrieved_sops": sops,
+                "count": len(sops),
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "retrieved_sops": [],
+                "count": 0,
+                "error": str(e),
+            }

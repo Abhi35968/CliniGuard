@@ -5,6 +5,10 @@ from src.config import SOPS_FILE_PATH, RETRIEVAL_TOP_K
 from src.schemas.context import UserContext
 from src.retrieval.embeddings import EmbeddingService
 from src.retrieval.vector_store import VectorStore
+from src.observability import get_logger
+
+logger = get_logger("retriever")
+
 
 
 class SOPRetriever:
@@ -54,31 +58,41 @@ class SOPRetriever:
                     vectors = self.embedding_service.embed_documents(contents)
                     self.vector_store.add_documents(doc_ids, contents, vectors, metadatas)
         except Exception as e:
-            print(f"[SOPRetriever] Error indexing SOPs: {e}")
+            logger.error("Error indexing SOPs: %s", e)
 
     def retrieve(
         self,
         query: str,
         context: UserContext,
         top_k: int = RETRIEVAL_TOP_K,
+        min_score: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieves relevant SOPs matching query and context via semantic vector search & metadata evaluation.
+        When semantic search succeeds but yields no relevant matches, returns an empty list.
+        Never injects arbitrary raw SOP catalog entries as semantic results.
         """
         self._index_sops()  # Ensure cache is fresh
 
         if not self._sops_cache:
             return []
 
-        query_str = query.strip()
-        activity = (context.activity or "").lower()
-        demographics = [d.lower() for d in context.demographics]
+        query_str = (query or "").strip()
+        activity = (context.activity or "").strip().lower()
+
+        query_text = query_str or activity
+        if not query_text:
+            return []
 
         # Embed query for semantic search
-        query_vector = self.embedding_service.embed_query(query_str or activity or "outdoor safety")
+        query_vector = self.embedding_service.embed_query(query_text)
 
         # Perform semantic similarity search
-        vector_results = self.vector_store.similarity_search(query_vector=query_vector, top_k=top_k * 2)
+        vector_results = self.vector_store.similarity_search(
+            query_vector=query_vector,
+            top_k=top_k * 2,
+            min_score=min_score,
+        )
 
         matched_candidates: List[Dict[str, Any]] = []
 
@@ -87,8 +101,8 @@ class SOPRetriever:
             sop_copy["similarity_score"] = round(float(score), 4)
             matched_candidates.append(sop_copy)
 
-        # Fallback: if vector store produces empty, return raw SOP cache
-        if not matched_candidates:
-            matched_candidates = [dict(s) for s in self._sops_cache]
-
         return matched_candidates[:top_k]
+
+    def reload_sops(self) -> None:
+        """Forces immediate re-indexing of SOPs from disk."""
+        self._index_sops(force_reload=True)

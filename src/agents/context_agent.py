@@ -4,6 +4,10 @@ from src.schemas.context import UserContext
 from src.llm.factory import get_llm_for_task
 from src.llm.prompts import INTENT_EXTRACTION_SYSTEM_PROMPT
 from src.llm.abstraction import LLMProvider
+from src.observability import get_logger
+
+logger = get_logger("agents.context")
+
 
 
 class ContextExtractionAgent:
@@ -63,5 +67,5 @@ class ContextExtractionAgent:
 
             return context
         except Exception as e:
-            print(f"[ContextExtractionAgent] Error: {e}. Using fallback factory.")
+            logger.warning("Context extraction error: %s. Using fallback factory.", e)
             return fallback_factory()

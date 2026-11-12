@@ -62,3 +62,5 @@ WEATHER_API_TIMEOUT = float(os.getenv("WEATHER_API_TIMEOUT", "10.0"))
 # Feature Flags
 ENABLE_SEMANTIC_RETRIEVAL = os.getenv("ENABLE_SEMANTIC_RETRIEVAL", "true").lower() == "true"
 ENABLE_INPUT_GUARDRAILS = os.getenv("ENABLE_INPUT_GUARDRAILS", "true").lower() == "true"
+# Observability & Logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

@@ -11,7 +11,7 @@ def extract_entities_fallback(query: str, existing_context: Dict[str, Any]) -> D
     # 1. Location extraction
     location = None
     cities = [
-        "bhopal", "new delhi", "delhi", "mumbai", "bengaluru", "bangalore", "chennai",
+        "bhopal", "new delhi", "delhi", "mumbai", "bengaluru", "bangalore", "banglore", "chennai",
         "kolkata", "hyderabad", "pune", "ahmedabad", "jaipur", "lucknow", "chandigarh",
         "goa", "shimla", "manali", "surat", "patna", "indore", "london", "new york", "berlin", "tokyo"
     ]

@@ -13,6 +13,10 @@ from src.config import (
     OPENROUTER_API_KEY,
 )
 from src.llm.abstraction import LLMProvider
+from src.observability import get_logger
+
+logger = get_logger("llm_factory")
+
 
 
 def get_llm_for_task(task_type: str = "generation") -> LLMProvider:
@@ -96,6 +100,6 @@ def get_llm_for_task(task_type: str = "generation") -> LLMProvider:
             )
 
     except Exception as e:
-        print(f"[LLM Factory] Could not initialize provider '{provider}' for task '{task_type}': {e}.")
+        logger.warning("Could not initialize provider '%s' for task '%s': %s", provider, task_type, e)
 
     return LLMProvider(chat_model=chat_model, model_name=target_model if chat_model else "fallback")

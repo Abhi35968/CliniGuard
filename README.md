@@ -185,13 +185,42 @@ ENABLE_INPUT_GUARDRAILS=true
 
 ---
 
-## 7. Running the Application
+## 7. Running the Application & Streaming Workflows
 
-### Launch Streamlit Dashboard
-```bash
+CliniGuard supports both **Direct In-Process Streaming** (ideal for standalone local development) and **Decoupled FastAPI SSE Streaming** (for distributed microservices).
+
+### Option A: Standalone Streamlit Dashboard (Direct Streaming)
+Run Streamlit directly. The frontend directly consumes the LangGraph streaming generator `stream_agent_turn`:
+```powershell
 streamlit run frontend/app.py
 ```
 Open your browser at `http://localhost:8501`.
+
+### Option B: Decoupled Architecture (FastAPI + Streamlit SSE)
+1. **Start the FastAPI backend server:**
+   ```powershell
+   uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload
+   ```
+2. **Start the Streamlit frontend with backend link:**
+   ```powershell
+   $env:CLINIGUARD_API_URL="http://localhost:8000"
+   streamlit run frontend/app.py
+   ```
+   *(Alternatively, enter `http://localhost:8000` under **Backend Streaming Settings** in the Streamlit sidebar).*
+
+### Real-Time Streaming Progress Stages
+As your query executes, the frontend renders live progress milestones inside a native `st.status` container:
+- 🛡️ **Input security validation**: Queries are checked for prompt injections and malicious bypass attempts.
+- 🧠 **Understanding request**: Extracts activity, location, timeframe, and vulnerable demographics.
+- 🌤️ **Fetching weather telemetry**: Retrieves live, verified meteorological data from Open-Meteo.
+- 📋 **Evaluating safety policies**: Matches live conditions against clinical SOPs using deterministic priority resolution.
+- 🤖 **Generating advisory**: Synthesizes structured clinical advisory. Intermediate unverified drafts are flagged with an orange warning badge (`⚠️ Provisional Draft (Unverified)`).
+- 🔍 **Validating final response**: Grounding checks verify numerical consistency with weather telemetry before displaying the authoritative verified advisory.
+
+### Troubleshooting & Connection Failures
+- **`401 Unauthorized` / Authentication Failed**: Ensure you have entered the valid `ACCESS_KEY` in the sidebar authentication panel.
+- **`429 Rate Limit Exceeded`**: The system limits requests to protect LLM quotas (default: 10 queries/min). Wait the indicated number of seconds before re-querying.
+- **`Unable to reach backend service`**: If using FastAPI SSE mode, ensure `uvicorn src.api:app` is running on the specified port and firewall permissions allow localhost connections. Clear the custom API URL in the sidebar to fall back to standalone direct mode.
 
 ---
 
